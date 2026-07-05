@@ -56,6 +56,11 @@ if "notes" not in st.session_state:
 # Interactive Global Search Node
 search_query = st.sidebar.text_input("🔍 Filter Network Nodes...", "").lower()
 
+# Creator Credit Node
+st.sidebar.markdown("---")
+st.sidebar.caption("🛸 **System Creator:** Ratneshwar Veerappan")
+st.sidebar.caption("⚙️ **Core version:** 2026.1.0 // Operational")
+
 # Render Notebook Node Access Controls
 st.sidebar.subheader("🗂️ Stored Notebook Repositories")
 selected_node = None
@@ -129,3 +134,13 @@ with tab_tools:
             elif run_sched:
                 with st.spinner("Scheduling..."):
                     st.write(query_ai(f"Create a high efficiency day-by-day study roadmap for an exam on {subject}: {title} in {days} days."))
+# --- GLOBAL WEB FOOTER ---
+st.markdown("---")
+st.markdown(
+    """
+    <div style="text-align: center; font-family: 'Courier New', monospace; color: #9ca3af; font-size: 0.85rem; padding: 20px;">
+        // CogniCore OS Engine built & operationalized by <span style="color: #00f0ff; font-weight: bold;">Ratneshwar Veerappan</span> © 2026
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
