@@ -4,13 +4,16 @@ import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
 
-# Load local environment variables securely from .env
+# Load local environment variables securely from .env configuration
 load_dotenv()
 
-# Initialize Groq Client
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "Put your own API key here")
+# Initialize Groq Client Securely (Hardcoded fallback token text removed to protect assets)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 try:
-    ai_client = Groq(api_key=GROQ_API_KEY)
+    if GROQ_API_KEY:
+        ai_client = Groq(api_key=GROQ_API_KEY)
+    else:
+        ai_client = None
 except Exception:
     ai_client = None
 
@@ -56,11 +59,6 @@ if "notes" not in st.session_state:
 # Interactive Global Search Node
 search_query = st.sidebar.text_input("🔍 Filter Network Nodes...", "").lower()
 
-# Creator Credit Node
-st.sidebar.markdown("---")
-st.sidebar.caption("🛸 **System Creator:** Ratneshwar Veerappan")
-st.sidebar.caption("⚙️ **Core version:** 2026.1.0 // Operational")
-
 # Render Notebook Node Access Controls
 st.sidebar.subheader("🗂️ Stored Notebook Repositories")
 selected_node = None
@@ -68,6 +66,11 @@ for note_id, data in list(st.session_state.notes.items()):
     if search_query in data['title'].lower() or search_query in note_id.lower():
         if st.sidebar.button(f"📂 [{note_id.upper()}] {data['title']}", key=note_id):
             selected_node = note_id
+
+# 🛸 Creator Credit Node added to sidebar matrix footer
+st.sidebar.markdown("---")
+st.sidebar.caption("🛸 **System Creator:** Ratneshwar Veerappan")
+st.sidebar.caption("⚙️ **Core version:** 2026.1.0 // Operational")
 
 # --- MAIN DASHBOARD WORKSPACE PANELS ---
 st.title("🤖 CogniCore Workspace // Web Node")
@@ -98,8 +101,40 @@ with tab_editor:
             st.warning("Validation Error: All framework fields must be populated.")
 
 with tab_chat:
-    st.subheader("// Direct LLM Communication Stream")
-    user_query = st.text_input("Ask any complex scientific question or prompt concept verification here:", key="chat_in")
+    st.subheader("// Neural Chat Engine // Voice & Text Node")
+    
+    # 1. Dual-Input Interface Layout (Voice vs Text)
+    col_input_txt, col_input_mic = st.columns([3, 1])
+    
+    with col_input_txt:
+        user_query = st.text_input("Type manual concept queries here:", key="chat_in")
+        
+    with col_input_mic:
+        # High-efficiency recording node using native browser audio pipelines
+        voice_audio = st.audio_input("🎙️ Voice Capture Command")
+
+    # 2. Asynchronous Audio Matrix Parsing Process
+    if voice_audio:
+        # Check if we have already compiled this unique audio clip to prevent loops
+        audio_bytes = voice_audio.read()
+        audio_id = f"audio_{len(audio_bytes)}"
+        
+        if "last_processed_audio" not in st.session_state or st.session_state.last_processed_audio != audio_id:
+            with st.spinner("Transcribing Voice Transmission..."):
+                try:
+                    # Leverage Groq's high-speed Whisper model to translate audio to text string
+                    transcription = ai_client.audio.transcriptions.create(
+                        model="whisper-large-v3",
+                        file=("audio.wav", audio_bytes),
+                        response_format="text"
+                    )
+                    user_query = transcription.strip()
+                    st.session_state.last_processed_audio = audio_id
+                    st.success(f"🗣️ Decrypted Audio Vector: \"{user_query}\"")
+                except Exception as audio_err:
+                    st.error(f"❌ Core Transcription Failure: {str(audio_err)}")
+
+    # 3. LLM Query Submission Core
     if user_query:
         with st.spinner("Streaming from Groq Neural Matrix..."):
             response = query_ai(user_query, "You are a highly capable engineering instructor.")
@@ -134,7 +169,8 @@ with tab_tools:
             elif run_sched:
                 with st.spinner("Scheduling..."):
                     st.write(query_ai(f"Create a high efficiency day-by-day study roadmap for an exam on {subject}: {title} in {days} days."))
-# --- GLOBAL WEB FOOTER ---
+
+# --- GLOBAL APPLICATION FOOTER ---
 st.markdown("---")
 st.markdown(
     """
