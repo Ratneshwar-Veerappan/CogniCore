@@ -83,22 +83,50 @@ default_subj = st.session_state.notes[selected_node]["title"] if selected_node e
 default_cont = st.session_state.notes[selected_node]["content"] if selected_node else ""
 
 with tab_editor:
-    st.subheader("// Active Matrix Entry Window")
-    col1, col2 = st.columns(2)
-    with col1:
-        subject = st.text_input("Core Academic Field / Subject Unit:", value=selected_node or "")
-    with col2:
-        title = st.text_input("Topic Target Header:", value=default_subj)
-        
-    content = st.text_area("Source Lecture Document Metadata Matrix:", value=default_cont, height=250)
+    st.subheader("Editor")
     
-    if st.button("💾 Compile & Commit to Local Memory"):
-        if subject and title and content:
-            st.session_state.notes[subject] = {"title": title, "content": content}
-            st.success(f"Success: Node '{title}' committed to runtime database layer!")
+    # 1. Input Fields
+    subject = st.text_input("Subject", value=selected_node or "")
+    title = st.text_input("Title", value=default_subj)
+    content = st.text_area("Content", value=default_cont, height=350)
+    
+    # 2. The Action Bar (New, Save, Delete, Export)
+    st.write("") # Spacer
+    col_new, col_save, col_del, col_exp, spacer = st.columns([1, 1, 1, 1, 4])
+    
+    with col_new:
+        if st.button("New"):
+            # Clear logic here
             st.rerun()
-        else:
-            st.warning("Validation Error: All framework fields must be populated.")
+            
+    with col_save:
+        if st.button("Save"):
+            if subject and title:
+                st.session_state.notes[subject] = {"title": title, "content": content}
+                st.toast(f"Node '{title}' saved successfully!", icon="💾") # Use toast instead of big success block!
+                st.rerun()
+            else:
+                st.toast("Subject and Title are required.", icon="⚠️")
+                
+    with col_del:
+        if st.button("Delete"):
+            if subject in st.session_state.notes:
+                del st.session_state.notes[subject]
+                st.toast("Node deleted.", icon="🗑️")
+                st.rerun()
+                
+    with col_exp:
+        if st.button("Export"):
+            st.toast("Exporting to CSV...", icon="📥")
+            # Export logic here
+
+    # 3. Document Upload Zone
+    st.markdown("---")
+    st.caption("Import a note (.txt, .pdf) or bulk-import notes (.csv)")
+    uploaded_file = st.file_uploader("Upload", type=["txt", "csv", "pdf"], label_visibility="collapsed")
+    
+    if uploaded_file:
+        st.toast(f"File {uploaded_file.name} loaded into matrix buffer.", icon="✅")
 
 with tab_chat:
     st.subheader("// Neural Chat Engine // Voice & Text Node")
@@ -141,42 +169,127 @@ with tab_chat:
             st.markdown(f"**🤖 CogniCore AI Platform Engine:**\n\n{response}")
 
 with tab_tools:
-    st.subheader("// Asynchronous Core Execution Operations")
+    st.subheader("AI Compilation & Synthesis Matrix")
+    
     if not content.strip():
-        st.info("System Standby: Populate database notes inside the Core Workspace Tab first.")
+        st.info("🔌 System Standby: Populate source lecture metadata in the Core Workspace first to unlock synthesis tools.")
     else:
-        col_actions, col_display = st.columns([1, 2])
+        # Create a split screen: Left is controls, Right is live output
+        col_controls, col_output = st.columns([1, 2])
         
-        with col_actions:
-            run_sum = st.button("📝 Generate Core Summary")
-            run_flash = st.button("🧠 Build Flashcard Matrix")
-            run_quiz = st.button("🎯 Compile Evaluation Quiz")
+        with col_controls:
+            st.markdown("### 🛠️ Execution Controls")
+            
+            # --- GROUP 1: FAST SYNTHESIS ---
+            st.caption("CORE COMPILATION")
+            run_sum = st.button("📝 Compile Core Summary", use_container_width=True)
+            run_flash = st.button("🧠 Build Flashcard Matrix", use_container_width=True)
+            run_quiz = st.button("🎯 Compile Evaluation Quiz", use_container_width=True)
             
             st.markdown("---")
-            days = st.slider("Target Exam Buffer Threshold (Days):", 1, 30, 7)
-            run_sched = st.button("📅 Build Tactical Roadmap")
             
-        with col_display:
+            # --- GROUP 2: TACTICAL PLANNING ---
+            st.caption("PLANNING & STRATEGY")
+            days = st.slider("Exam Buffer Threshold (Days):", 1, 30, 7)
+            run_sched = st.button("📅 Build Tactical Roadmap", use_container_width=True)
+            
+        with col_output:
+            st.markdown("### 🖥️ Output Terminal")
+            
+            # Placeholder container that updates based on button click
+            output_placeholder = st.empty()
+            
+            # We initialize a session state key to hold the current compiled text
+            if "last_compiled_output" not in st.session_state:
+                st.session_state.last_compiled_output = ""
+            if "last_compiled_type" not in st.session_state:
+                st.session_state.last_compiled_type = ""
+
+            # 1. Action: Summary
             if run_sum:
-                with st.spinner("Summarizing..."):
-                    st.write(query_ai(f"Summarize cleanly into structural bullets:\n\n{content}"))
+                with st.spinner("Executing Summary Compilation Protocol..."):
+                    result = query_ai(f"Summarize cleanly into structural bullets:\n\n{content}")
+                    st.session_state.last_compiled_output = result
+                    st.session_state.last_compiled_type = f"Summary_{subject.replace(' ', '_')}"
+
+            # 2. Action: Flashcards
             elif run_flash:
-                with st.spinner("Generating flashcards..."):
-                    st.write(query_ai(f"Create 5 Q&A layout flashcard pairs:\n\n{content}"))
+                with st.spinner("Structuring Neural Flashcard Matrix..."):
+                    result = query_ai(f"Create 5 Q&A layout flashcard pairs:\n\n{content}")
+                    st.session_state.last_compiled_output = result
+                    st.session_state.last_compiled_type = f"Flashcards_{subject.replace(' ', '_')}"
+
+            # 3. Action: Quiz
             elif run_quiz:
-                with st.spinner("Compiling evaluation..."):
-                    st.write(query_ai(f"Create a 3-question multiple choice quiz with answer keys:\n\n{content}"))
+                with st.spinner("Generating Evaluation Metrics..."):
+                    result = query_ai(f"Create a 3-question multiple choice quiz with answer keys:\n\n{content}")
+                    st.session_state.last_compiled_output = result
+                    st.session_state.last_compiled_type = f"Quiz_{subject.replace(' ', '_')}"
+
+            # 4. Action: Schedule
             elif run_sched:
-                with st.spinner("Scheduling..."):
-                    st.write(query_ai(f"Create a high efficiency day-by-day study roadmap for an exam on {subject}: {title} in {days} days."))
+                with st.spinner("Mapping Temporal Roadmap..."):
+                    result = query_ai(f"Create a high efficiency day-by-day study roadmap for an exam on {subject}: {title} in {days} days.")
+                    st.session_state.last_compiled_output = result
+                    st.session_state.last_compiled_type = f"Schedule_{subject.replace(' ', '_')}"
+
+            # Display the compiled output in a code-styled console block or markdown block
+            if st.session_state.last_compiled_output:
+                # Render the text beautifully
+                st.markdown(st.session_state.last_compiled_output)
+                
+                # --- PROFESSIONAL ADDITION: EXPORT FILE LINK ---
+                st.markdown("---")
+                st.download_button(
+                    label="💾 Export Output to Local Disk (.txt)",
+                    data=st.session_state.last_compiled_output,
+                    file_name=f"{st.session_state.last_compiled_type}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+            else:
+                st.info("System Idle. Select an execution command from the console panel to compile.")
 
 # --- GLOBAL APPLICATION FOOTER ---
 st.markdown("---")
-st.markdown(
-    """
-    <div style="text-align: center; font-family: 'Courier New', monospace; color: #9ca3af; font-size: 0.85rem; padding: 20px;">
-        // CogniCore OS Engine built & operationalized by <span style="color: #00f0ff; font-weight: bold;">Ratneshwar Veerappan</span> © 2026
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
+# Premium UI Styling Matrix
+st.markdown("""
+    <style>
+    /* Main Backgrounds */
+    .stApp { background-color: #0f1115; color: #e2e8f0; }
+    [data-testid="stSidebar"] { background-color: #16181d; border-right: 1px solid #2d3748; }
+    
+    /* Input Fields (Subject, Title, Search) */
+    .stTextInput > div > div > input {
+        background-color: #1e2128;
+        color: #ffffff;
+        border-radius: 6px;
+        border: 1px solid #2d3748;
+    }
+    
+    /* Text Area (Main Content) */
+    .stTextArea > div > div > textarea {
+        background-color: #1e2128;
+        color: #ffffff;
+        border-radius: 6px;
+        border: 1px solid #2d3748;
+    }
+    
+    /* Modern Action Buttons */
+    .stButton > button {
+        background-color: transparent;
+        color: #9ca3af;
+        border: 1px solid #4b5563;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        background-color: #2d3748;
+        color: #ffffff;
+        border: 1px solid #718096;
+    }
+    
+    /* Typography improvements */
+    h1, h2, h3 { font-family: 'Inter', sans-serif; }
+    </style>
+""", unsafe_allow_html=True)
