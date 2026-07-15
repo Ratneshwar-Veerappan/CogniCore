@@ -13,7 +13,7 @@ load_dotenv()
 db = TinyDB("cognicore_db.json")
 NotesQuery = Query()
 
-# Initialize Groq Client securely (Forces loading from .env without risk of leakage)
+# Initialize Groq Client securely
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 try:
     if GROQ_API_KEY:
@@ -117,27 +117,39 @@ for note_id, data in list(user_notes.items()):
 
 st.sidebar.markdown("---")
 st.sidebar.caption("🛸 **System Creator:** Ratneshwar Veerappan")
-st.sidebar.caption("⚙️ **Core version:** 2026.1.2 // Permanent Storage")
+st.sidebar.caption("⚙️ **Core version:** 2026.1.3 // Permanent Storage")
+
+# --- INITIALIZE STATE VARIABLES ---
+# Ensure these exist in session state so we can bind them safely
+if "editor_subject" not in st.session_state:
+    st.session_state.editor_subject = ""
+if "editor_title" not in st.session_state:
+    st.session_state.editor_title = ""
+if "editor_content" not in st.session_state:
+    st.session_state.editor_content = ""
+
+# If a sidebar node was clicked, load its data directly into state
+if selected_node:
+    st.session_state.editor_subject = selected_node
+    st.session_state.editor_title = user_notes[selected_node]["title"]
+    st.session_state.editor_content = user_notes[selected_node]["content"]
 
 # --- MAIN DASHBOARD WORKSPACE PANELS ---
 st.title("CogniCore Workspace // Web Node")
 
 tab_editor, tab_chat, tab_tools = st.tabs(["📝 Core Data Workspace", "💬 Neural Chat Engine", "⚡ AI Compilation Tools"])
 
-# Load selected note details if active
-default_subj = user_notes[selected_node]["title"] if selected_node else ""
-default_cont = user_notes[selected_node]["content"] if selected_node else ""
-
 with tab_editor:
     st.subheader("Workspace Editor")
     
     col1, col2 = st.columns(2)
     with col1:
-        subject = st.text_input("Subject Group / Academic Unit:", value=selected_node or "")
+        # Bind the inputs directly to the session state key
+        subject = st.text_input("Subject Group / Academic Unit:", key="editor_subject")
     with col2:
-        title = st.text_input("Topic Target Header:", value=default_subj)
+        title = st.text_input("Topic Target Header:", key="editor_title")
         
-    content = st.text_area("Source Lecture Document Metadata Matrix:", value=default_cont, height=280)
+    content = st.text_area("Source Lecture Document Metadata Matrix:", key="editor_content", height=280)
     
     # Elegant, clean button column layout mimicking your design reference image
     st.write("") 
@@ -145,6 +157,9 @@ with tab_editor:
     
     with col_new:
         if st.button("New", use_container_width=True):
+            st.session_state.editor_subject = ""
+            st.session_state.editor_title = ""
+            st.session_state.editor_content = ""
             st.rerun()
             
     with col_save:
@@ -168,6 +183,9 @@ with tab_editor:
         if st.button("Delete", use_container_width=True):
             if subject:
                 db.remove((NotesQuery.user == current_user) & (NotesQuery.subject == subject))
+                st.session_state.editor_subject = ""
+                st.session_state.editor_title = ""
+                st.session_state.editor_content = ""
                 st.toast(f"Deleted topic unit: '{subject}'", icon="🗑️")
                 st.rerun()
             else:
@@ -194,19 +212,19 @@ with tab_editor:
             file_type = uploaded_file.name.split(".")[-1]
             if file_type == "txt":
                 imported_text = uploaded_file.read().decode("utf-8")
-                # Pre-populate content with txt data
-                st.session_state[f"import_{uploaded_file.name}"] = imported_text
+                st.session_state.editor_content = imported_text
                 st.info(f"✅ Text loaded! Press 'Save' to commit to user database.")
-                content = imported_text
+                st.rerun()
             elif file_type == "csv":
                 imported_text = uploaded_file.read().decode("utf-8")
                 reader = csv.reader(imported_text.splitlines())
                 rows = list(reader)
                 if len(rows) > 1:
-                    subject = rows[1][0]
-                    title = rows[1][1]
-                    content = rows[1][2]
+                    st.session_state.editor_subject = rows[1][0]
+                    st.session_state.editor_title = rows[1][1]
+                    st.session_state.editor_content = rows[1][2]
                     st.success(f"✅ Loaded structured node matrix dynamically from CSV!")
+                    st.rerun()
         except Exception as upload_err:
             st.error(f"Failed to read file layout: {str(upload_err)}")
 
@@ -248,7 +266,12 @@ with tab_chat:
 with tab_tools:
     st.subheader("AI Compilation & Synthesis Matrix")
     
-    if not content.strip():
+    # Pull content safely from the persistent session state
+    active_content = st.session_state.editor_content
+    active_subject = st.session_state.editor_subject
+    active_title = st.session_state.editor_title
+    
+    if not active_content.strip():
         st.info("🔌 System Standby: Populate source lecture metadata in the Core Workspace first to unlock synthesis tools.")
     else:
         col_controls, col_output = st.columns([1, 2])
@@ -275,30 +298,36 @@ with tab_tools:
             if "last_compiled_type" not in st.session_state:
                 st.session_state.last_compiled_type = ""
 
+            # Check actions and execute queries using the active_content variable
             if run_sum:
                 with st.spinner("Executing Summary Compilation Protocol..."):
-                    result = query_ai(f"Summarize cleanly into structural bullets:\n\n{content}")
+                    result = query_ai(f"Summarize cleanly into structural bullets:\n\n{active_content}")
                     st.session_state.last_compiled_output = result
-                    st.session_state.last_compiled_type = f"Summary_{subject.replace(' ', '_')}"
+                    st.session_state.last_compiled_type = f"Summary_{active_subject.replace(' ', '_')}"
+                    st.rerun()
 
             elif run_flash:
                 with st.spinner("Structuring Neural Flashcard Matrix..."):
-                    result = query_ai(f"Create 5 Q&A layout flashcard pairs:\n\n{content}")
+                    result = query_ai(f"Create 5 Q&A layout flashcard pairs:\n\n{active_content}")
                     st.session_state.last_compiled_output = result
-                    st.session_state.last_compiled_type = f"Flashcards_{subject.replace(' ', '_')}"
+                    st.session_state.last_compiled_type = f"Flashcards_{active_subject.replace(' ', '_')}"
+                    st.rerun()
 
             elif run_quiz:
                 with st.spinner("Generating Evaluation Metrics..."):
-                    result = query_ai(f"Create a 3-question multiple choice quiz with answer keys:\n\n{content}")
+                    result = query_ai(f"Create a 3-question multiple choice quiz with answer keys for:\n\n{active_content}")
                     st.session_state.last_compiled_output = result
-                    st.session_state.last_compiled_type = f"Quiz_{subject.replace(' ', '_')}"
+                    st.session_state.last_compiled_type = f"Quiz_{active_subject.replace(' ', '_')}"
+                    st.rerun()
 
             elif run_sched:
                 with st.spinner("Mapping Temporal Roadmap..."):
-                    result = query_ai(f"Create a high efficiency day-by-day study roadmap for an exam on {subject}: {title} in {days} days.")
+                    result = query_ai(f"Create a high efficiency day-by-day study roadmap for an exam on {active_subject}: {active_title} in {days} days.")
                     st.session_state.last_compiled_output = result
-                    st.session_state.last_compiled_type = f"Schedule_{subject.replace(' ', '_')}"
+                    st.session_state.last_compiled_type = f"Schedule_{active_subject.replace(' ', '_')}"
+                    st.rerun()
 
+            # Render output screen state
             if st.session_state.last_compiled_output:
                 st.markdown(st.session_state.last_compiled_output)
                 
