@@ -1,6 +1,7 @@
 import os
 import csv
 import json
+import base64
 import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
@@ -87,10 +88,39 @@ def query_ai(prompt, system_instruction="You are an expert academic tutor."):
     except Exception as e:
         return f"❌ System Error querying AI: {str(e)}"
 
+# Helper Function: Query Vision AI Engine
+# Helper Function: Query Vision AI Engine
+def query_vision_ai(image_bytes, user_prompt="Analyze this image."):
+    if not ai_client or not GROQ_API_KEY:
+        return "⚠️ Setup Error: Groq API Key missing or unconfigured."
+    try:
+        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+        completion = ai_client.chat.completions.create(
+            model="qwen/qwen3.6-27b",  # 👈 Updated to Groq's active vision model!
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.5,
+            max_tokens=2048
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        return f"❌ Vision Error querying AI: {str(e)}"
+
 # --- SIDEBAR USER MANAGEMENT & DATA RETRIEVAL ---
 st.sidebar.title("👤 User Session Node")
 
-# Simple profile switching configuration
 current_user = st.sidebar.text_input("Access Credentials / Profile Key:", value="Guest").strip().lower()
 
 if current_user == "guest":
@@ -100,14 +130,11 @@ else:
 
 st.sidebar.markdown("---")
 
-# Query only the notes belonging to the currently authenticated profile
 db_records = db.search(NotesQuery.user == current_user)
 user_notes = {rec["subject"]: {"title": rec["title"], "content": rec["content"]} for rec in db_records}
 
-# Interactive Global Search Node
 search_query = st.sidebar.text_input("🔍 Filter Network Nodes...", "").lower()
 
-# Render Notebook Node Access Controls from Database
 st.sidebar.subheader("🗂️ Stored Notebook Repositories")
 selected_node = None
 for note_id, data in list(user_notes.items()):
@@ -120,7 +147,6 @@ st.sidebar.caption("🛸 **System Creator:** Ratneshwar Veerappan")
 st.sidebar.caption("⚙️ **Core version:** 2026.1.3 // Permanent Storage")
 
 # --- INITIALIZE STATE VARIABLES ---
-# Ensure these exist in session state so we can bind them safely
 if "editor_subject" not in st.session_state:
     st.session_state.editor_subject = ""
 if "editor_title" not in st.session_state:
@@ -128,7 +154,6 @@ if "editor_title" not in st.session_state:
 if "editor_content" not in st.session_state:
     st.session_state.editor_content = ""
 
-# If a sidebar node was clicked, load its data directly into state
 if selected_node:
     st.session_state.editor_subject = selected_node
     st.session_state.editor_title = user_notes[selected_node]["title"]
@@ -144,14 +169,12 @@ with tab_editor:
     
     col1, col2 = st.columns(2)
     with col1:
-        # Bind the inputs directly to the session state key
         subject = st.text_input("Subject Group / Academic Unit:", key="editor_subject")
     with col2:
         title = st.text_input("Topic Target Header:", key="editor_title")
         
     content = st.text_area("Source Lecture Document Metadata Matrix:", key="editor_content", height=280)
     
-    # Elegant, clean button column layout mimicking your design reference image
     st.write("") 
     col_new, col_save, col_del, col_exp, col_spacer = st.columns([1, 1, 1, 1, 4])
     
@@ -165,9 +188,7 @@ with tab_editor:
     with col_save:
         if st.button("Save", use_container_width=True):
             if subject and title and content:
-                # Remove existing record of the same subject for this user before updating
                 db.remove((NotesQuery.user == current_user) & (NotesQuery.subject == subject))
-                # Commit clean record
                 db.insert({
                     "user": current_user,
                     "subject": subject,
@@ -192,7 +213,6 @@ with tab_editor:
                 st.toast("Select a saved subject to delete.", icon="⚠️")
                 
     with col_exp:
-        # Simple JSON download of raw active note structure
         note_json = json.dumps({"subject": subject, "title": title, "content": content}, indent=4)
         st.download_button(
             label="Export",
@@ -202,7 +222,7 @@ with tab_editor:
             use_container_width=True
         )
 
-    # 3. Premium Interactive Document Upload & Automatic Parsing Node
+    # Document Upload Panel
     st.markdown("---")
     st.caption("📥 Import an external study file (.txt or .csv data)")
     uploaded_file = st.file_uploader("Upload Node Configuration File", type=["txt", "csv"], label_visibility="collapsed")
@@ -231,13 +251,19 @@ with tab_editor:
 with tab_chat:
     st.subheader("Neural Chat Engine")
     
-    col_input_txt, col_input_mic = st.columns([3, 1])
+    # 3-Column Layout: Text input, Voice Input, and Camera Input Node
+    col_input_txt, col_input_mic, col_input_cam = st.columns([3, 1, 1])
     
     with col_input_txt:
-        user_query = st.text_input("Type manual concept queries here:", key="chat_in")
+        user_query = st.text_input("Type manual concept queries or instructions for your image here:", key="chat_in")
         
     with col_input_mic:
         voice_audio = st.audio_input("🎙️ Voice Capture Command")
+        
+    with col_input_cam:
+        # Mini expander tool to avoid camera rendering over the whole screen unless opened
+        with st.expander("📸 Visual Lens Engine"):
+            chat_photo = st.camera_input("Snapshot Core", label_visibility="collapsed")
 
     # Asynchronous Audio Matrix Parsing Process
     if voice_audio:
@@ -258,7 +284,19 @@ with tab_chat:
                 except Exception as audio_err:
                     st.error(f"❌ Core Transcription Failure: {str(audio_err)}")
 
-    if user_query:
+    # Execution Processing
+    if chat_photo:
+        # If there is a photo, prioritize Vision Processing Pipeline
+        with st.spinner("Streaming Matrix Vector to Vision AI Matrix..."):
+            photo_bytes = chat_photo.read()
+            prompt_text = user_query if user_query else "Describe this study material or diagram in detail and break down its core concepts."
+            response = query_vision_ai(photo_bytes, prompt_text)
+            
+            st.image(chat_photo, caption="Analyzed Core Visual Matrix Vector", width=300)
+            st.markdown(f"**🤖 CogniCore AI Vision Engine:**\n\n{response}")
+            
+    elif user_query:
+        # Fall back to standard text conversation processing
         with st.spinner("Streaming from Groq Neural Matrix..."):
             response = query_ai(user_query, "You are a highly capable engineering instructor.")
             st.markdown(f"**🤖 CogniCore AI Platform Engine:**\n\n{response}")
@@ -266,7 +304,6 @@ with tab_chat:
 with tab_tools:
     st.subheader("AI Compilation & Synthesis Matrix")
     
-    # Pull content safely from the persistent session state
     active_content = st.session_state.editor_content
     active_subject = st.session_state.editor_subject
     active_title = st.session_state.editor_title
@@ -298,7 +335,6 @@ with tab_tools:
             if "last_compiled_type" not in st.session_state:
                 st.session_state.last_compiled_type = ""
 
-            # Check actions and execute queries using the active_content variable
             if run_sum:
                 with st.spinner("Executing Summary Compilation Protocol..."):
                     result = query_ai(f"Summarize cleanly into structural bullets:\n\n{active_content}")
@@ -327,10 +363,8 @@ with tab_tools:
                     st.session_state.last_compiled_type = f"Schedule_{active_subject.replace(' ', '_')}"
                     st.rerun()
 
-            # Render output screen state
             if st.session_state.last_compiled_output:
                 st.markdown(st.session_state.last_compiled_output)
-                
                 st.markdown("---")
                 st.download_button(
                     label="💾 Export Output to Local Disk (.txt)",
